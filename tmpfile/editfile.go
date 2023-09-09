@@ -66,7 +66,7 @@ func padidx(idx uint64) []byte {
 	return ret
 }
 
-func genHeader(deletedData []deleteddData) Header {
+func genHeader(deletedData []deleteddData) []byte {
 	var idx []byte
 	var cnt int
 	for _, v := range deletedData {
@@ -74,10 +74,7 @@ func genHeader(deletedData []deleteddData) Header {
 		cnt++
 	}
 	fmt.Println(idx)
-	return Header{
-		signiture: []byte(".GR4PE"),
-		idx:       idx,
-	}
+	return append([]byte(".GR4PE"), idx...)
 }
 
 func readByte(filename string) ([]byte, error) {
