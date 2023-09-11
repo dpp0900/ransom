@@ -73,7 +73,6 @@ func genHeader(deletedData []deleteddData) []byte {
 		idx = append(idx, []byte("IDX"+strconv.Itoa(cnt)+string(padidx(v.idx)))...)
 		cnt++
 	}
-	fmt.Println(idx)
 	return append([]byte(".GR4PE"), idx...)
 }
 
@@ -110,7 +109,7 @@ func main() {
 	check(err)
 	fmt.Print(genHeader([]deleteddData{
 		{
-			idx:  0x000000000000,
+			idx:  0x000000000100,
 			data: buf,
 		},
 		{
