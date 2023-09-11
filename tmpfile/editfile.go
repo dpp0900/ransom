@@ -13,7 +13,7 @@ type Header struct {
 	idx       []byte //IDXn.0xFFFFFFFFFFFF
 }
 
-type deleteddData struct {
+type deletedData struct {
 	idx  uint64 //IDXn.0xFFFFFFFFFFFF
 	data []byte //data
 }
@@ -22,6 +22,31 @@ func check(e error) {
 	if e != nil {
 		panic(e)
 	}
+}
+func readByte(filename string) ([]byte, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	fileSize := fileInfo.Size()
+	fileBytes := make([]byte, fileSize)
+	bytesRead := 0
+	for bytesRead < int(fileSize) {
+		n, err := file.Read(fileBytes[bytesRead:])
+		if err != nil && err != io.EOF {
+			return nil, err
+		}
+		if n == 0 {
+			break
+		}
+		bytesRead += n
+	}
+	return fileBytes, nil
 }
 func tt() {
 	// 입력 파일 이름과 출력 파일 이름을 지정합니다.
@@ -61,53 +86,26 @@ func tt() {
 	fmt.Println("파일 처리 완료")
 }
 
-func padidx(idx uint64) []byte {
-	var ret = []byte(".0x" + strings.Repeat("0", (12-len(strconv.FormatUint(idx, 16)))) + strconv.FormatUint(idx, 16))
-	return ret
-}
-
-func genHeader(deletedData []deleteddData) []byte {
+func genHeader(deletedData []deletedData) []byte {
 	var idx []byte
 	var cnt int
 	for _, v := range deletedData {
-		idx = append(idx, []byte("IDX"+strconv.Itoa(cnt)+string(padidx(v.idx)))...)
+		idx = append(idx, []byte(
+			"IDX"+strconv.Itoa(cnt)+string(
+				[]byte(".0x"+
+					strings.Repeat("0", (12-len(strconv.FormatUint(v.idx, 16))))+
+					strconv.FormatUint(v.idx, 16))))...,
+		)
 		cnt++
 	}
 	return append([]byte(".GR4PE"), idx...)
-}
-
-func readByte(filename string) ([]byte, error) {
-	file, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-	fileInfo, err := file.Stat()
-	if err != nil {
-		return nil, err
-	}
-	fileSize := fileInfo.Size()
-	fileBytes := make([]byte, fileSize)
-	bytesRead := 0
-	for bytesRead < int(fileSize) {
-		n, err := file.Read(fileBytes[bytesRead:])
-		if err != nil && err != io.EOF {
-			return nil, err
-		}
-		if n == 0 {
-			break
-		}
-		bytesRead += n
-	}
-
-	return fileBytes, nil
 }
 
 func main() {
 	inputFileName := "tmpfile/in/test"
 	buf, err := readByte(inputFileName)
 	check(err)
-	fmt.Print(genHeader([]deleteddData{
+	fmt.Print(genHeader([]deletedData{
 		{
 			idx:  0x000000000100,
 			data: buf,
