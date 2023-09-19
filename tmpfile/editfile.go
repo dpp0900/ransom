@@ -19,71 +19,62 @@ type deletedData struct {
 }
 
 func check(e error) {
-	if e != nil {
+	if e != nil && e != io.EOF {
 		panic(e)
 	}
 }
-func readByte(filename string) ([]byte, error) {
+func readByte(filename string, offset int64, length int64) ([]byte, error) {
 	file, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
+	check(err)
 	defer file.Close()
 	fileInfo, err := file.Stat()
-	if err != nil {
-		return nil, err
+	check(err)
+	if offset+length > fileInfo.Size() {
+		return nil, fmt.Errorf("offset+length > fileInfo.Size()")
 	}
-	fileSize := fileInfo.Size()
-	fileBytes := make([]byte, fileSize)
-	bytesRead := 0
-	for bytesRead < int(fileSize) {
-		n, err := file.Read(fileBytes[bytesRead:])
-		if err != nil && err != io.EOF {
-			return nil, err
-		}
-		if n == 0 {
-			break
-		}
-		bytesRead += n
-	}
-	return fileBytes, nil
+	_, err = file.Seek(offset, 0)
+	check(err)
+	buf := make([]byte, length)
+	_, err = file.Read(buf)
+	check(err)
+	return buf, nil
 }
-func tt() {
-	// 입력 파일 이름과 출력 파일 이름을 지정합니다.
-	inputFileName := "1080p가세혁-해킹시연동영상공모전.mp4"
-	outputFileName := "output.txt"
 
-	// 입력 파일 열기
-	inputFile, err := os.Open(inputFileName)
-	if err != nil {
-		fmt.Println("파일 열기 실패:", err)
-		return
+func readNwriteBuf(wfile *os.File, rfile *os.File, buf []byte) {
+	_, err := rfile.Read(buf)
+	check(err)
+	_, err = wfile.Write(buf)
+	check(err)
+}
+
+func removeByte(filename string, offset int64, length int64) (string, error) {
+	ret, err := readByte(filename, offset, length)
+	check(err)
+	rfile, err := os.Open(filename)
+	check(err)
+	fileInfo, err := rfile.Stat()
+	check(err)
+	wfile, err := os.Create(filename + ".tmp")
+	check(err)
+	defer rfile.Close()
+	defer wfile.Close()
+	for i := int64(0); i < offset/4096; i++ {
+		buf := make([]byte, 4096)
+		readNwriteBuf(wfile, rfile, buf)
 	}
-	defer inputFile.Close()
-
-	// 출력 파일 생성
-	outputFile, err := os.Create(outputFileName)
-	if err != nil {
-		fmt.Println("파일 생성 실패:", err)
-		return
+	buf := make([]byte, offset%4096)
+	readNwriteBuf(wfile, rfile, buf)
+	_, err = rfile.Seek(length, 1)
+	check(err)
+	buf = make([]byte, 4096-(offset%4096)-length)
+	readNwriteBuf(wfile, rfile, buf)
+	for i := int64(0); i < (fileInfo.Size()-(offset+length))/4096; i++ {
+		buf := make([]byte, 4096)
+		readNwriteBuf(wfile, rfile, buf)
 	}
-	defer outputFile.Close()
-
-	// 입력 파일에서 앞 8192 바이트를 읽고 버립니다.
-	_, err = io.CopyN(io.Discard, inputFile, 8192)
-	if err != nil && err != io.EOF {
-		fmt.Println("파일 처리 실패:", err)
-		return
-	}
-
-	// 나머지 내용을 출력 파일로 복사합니다.
-	_, err = io.Copy(outputFile, inputFile)
-	if err != nil {
-		fmt.Println("파일 복사 실패:", err)
-		return
-	}
-
-	fmt.Println("파일 처리 완료")
+	buf = make([]byte, (fileInfo.Size()-(offset+length))%4096)
+	readNwriteBuf(wfile, rfile, buf)
+	return string(ret), nil
 }
 
 func genHeader(deletedData []deletedData) []byte {
@@ -103,20 +94,23 @@ func genHeader(deletedData []deletedData) []byte {
 
 func main() {
 	inputFileName := "tmpfile/in/test"
-	buf, err := readByte(inputFileName)
+	buf, err := removeByte(inputFileName, 40, 10)
 	check(err)
-	fmt.Print(genHeader([]deletedData{
-		{
-			idx:  0x000000000100,
-			data: buf,
-		},
-		{
-			idx:  0x000000000001,
-			data: []byte("test2"),
-		},
-		{
-			idx:  0x000000000002,
-			data: []byte("test3"),
-		},
-	}))
+	fmt.Println(buf)
+	/*
+		fmt.Print(genHeader([]deletedData{
+			{
+				idx:  0x000000000100,
+				data: buf,
+			},
+			{
+				idx:  0x000000000001,
+				data: []byte("test2"),
+			},
+			{
+				idx:  0x000000000002,
+				data: []byte("test3"),
+			},
+		}))
+	*/
 }
