@@ -13,13 +13,13 @@ import (
 
 type Header struct {
 	signiture []byte //.GR4PE
-	filename  []byte //nm.FILENAME
+	filename  []byte //FILENAME
 	Data      []Data //IDXn.0xFFFFFFFFFFFF
 }
 
 type uploadData struct {
 	signiture []byte //.GR4PE
-	filename  []byte //nm.FILENAME
+	filename  []byte //FILENAME
 	mac       []byte //MAC.0xFFFFFFFFFFFF
 	Data      []Data //IDXn.0xFFFFFFFFFFFF
 	iv        []byte //iv
