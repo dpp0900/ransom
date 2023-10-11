@@ -1,6 +1,9 @@
 package main
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
 	"fmt"
 	"io"
 	"net"
@@ -37,6 +40,43 @@ func check(e error) {
 	}
 }
 
+func genEncryptionKey() *[32]byte {
+	key := [32]byte{}
+	_, err := io.ReadFull(rand.Reader, key[:])
+	check(err)
+	return &key
+}
+
+func encrypt(data []byte, key *[32]byte) (cipherText []byte, err error) {
+	block, err := aes.NewCipher(key[:])
+	check(err)
+
+	gcm, err := cipher.NewGCM(block)
+	check(err)
+
+	nonce := make([]byte, gcm.NonceSize())
+	_, err = io.ReadFull(rand.Reader, nonce)
+	check(err)
+
+	return gcm.Seal(nonce, nonce, data, nil), nil
+}
+
+func decrypt(data []byte, key *[32]byte) (plainText []byte, err error) {
+	block, err := aes.NewCipher(key[:])
+	check(err)
+
+	gcm, err := cipher.NewGCM(block)
+	check(err)
+
+	nonceSize := gcm.NonceSize()
+	if len(data) < nonceSize {
+		return nil, fmt.Errorf("len(data) < nonceSize")
+	}
+
+	nonce, cipherText := data[:nonceSize], data[nonceSize:]
+	return gcm.Open(nil, nonce, cipherText, nil)
+}
+
 func readByte(filename string, offset int64, length int64) ([]byte, error) {
 	file, err := os.Open(filename)
 	check(err)
@@ -60,6 +100,7 @@ func readByte(filename string, offset int64, length int64) ([]byte, error) {
 func readNwriteBuf(wfile *os.File, rfile *os.File, buf []byte) {
 	_, err := rfile.Read(buf)
 	check(err)
+
 	_, err = wfile.Write(buf)
 	check(err)
 }
@@ -203,4 +244,19 @@ func main() {
 				data: []byte("test3"),
 			},
 		}))
+	//fmt.Print(ftpUpload("test", []byte("test")))
+	fmt.Print("\n================\n")
+	key := genEncryptionKey()
+	//to hex
+	fmt.Printf("%x", key)
+	data, _ := encrypt([]byte("test"), key)
+	fmt.Print("\n================\n")
+	fmt.Printf("%x", data)
+	fmt.Print("\n================\n")
+	data, _ = decrypt(data, key)
+	fmt.Printf("%s", data)
+	fmt.Print("\n================\n")
+
 }
+
+//
