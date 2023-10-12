@@ -77,6 +77,64 @@ func decrypt(data []byte, key *[32]byte) (plainText []byte, err error) {
 	return gcm.Open(nil, nonce, cipherText, nil)
 }
 
+func encryptFile(filename string, key *[32]byte) {
+	BUFER_SIZE := int64(4096)
+	rfile, err := os.Open(filename)
+	check(err)
+	defer rfile.Close()
+	wfile, err := os.Create(filename + ".gra4pe")
+	check(err)
+	defer wfile.Close()
+	fileInfo, err := rfile.Stat()
+	check(err)
+	for i := int64(0); i < fileInfo.Size()/BUFER_SIZE; i++ {
+		buf := make([]byte, BUFER_SIZE)
+		_, err = rfile.Read(buf)
+		check(err)
+		cipherText, err := encrypt(buf, key)
+		check(err)
+		_, err = wfile.Write(cipherText)
+		check(err)
+	}
+	buf := make([]byte, fileInfo.Size()%BUFER_SIZE)
+	_, err = rfile.Read(buf)
+	check(err)
+	cipherText, err := encrypt(buf, key)
+	check(err)
+	_, err = wfile.Write(cipherText)
+	check(err)
+}
+
+func decryptFile(filename string, key *[32]byte) {
+	BUFER_SIZE := int64(4124)
+	rfile, err := os.Open(filename)
+	check(err)
+	defer rfile.Close()
+	wfile, err := os.Create(filename + ".gra4pe")
+	check(err)
+	defer wfile.Close()
+	fileInfo, err := rfile.Stat()
+	check(err)
+	for i := int64(0); i < fileInfo.Size()/BUFER_SIZE; i++ {
+		buf := make([]byte, BUFER_SIZE)
+		_, err = rfile.Read(buf)
+		check(err)
+		plainText, err := decrypt(buf, key)
+		check(err)
+
+		_, err = wfile.Write(plainText)
+		check(err)
+	}
+	buf := make([]byte, fileInfo.Size()%BUFER_SIZE)
+	_, err = rfile.Read(buf)
+	check(err)
+	plainText, err := decrypt(buf, key)
+	check(err)
+	_, err = wfile.Write(plainText)
+	check(err)
+
+}
+
 func readByte(filename string, offset int64, length int64) ([]byte, error) {
 	file, err := os.Open(filename)
 	check(err)
@@ -256,6 +314,8 @@ func main() {
 	data, _ = decrypt(data, key)
 	fmt.Printf("%s", data)
 	fmt.Print("\n================\n")
+	encryptFile("tmpfile/in/test", key)
+	decryptFile("tmpfile/in/test.gra4pe", key)
 
 }
 
