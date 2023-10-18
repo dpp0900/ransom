@@ -4,8 +4,8 @@ from pyftpdlib.authorizers import DummyAuthorizer
 
 FTP_HOST = '0.0.0.0'
 FTP_PORT = 9021
-FTP_UPLOAD_DIR = '/home/ransom/ftp/upload'
-FTP_DOWNLOAD_DIR = '/home/ransom/ftp/download'
+FTP_UPLOAD_DIR = './upload'
+FTP_DOWNLOAD_DIR = './download'
 
 def main():
     auth = DummyAuthorizer()

