@@ -262,7 +262,7 @@ func genUploadHeader(filename []byte, deletedData []Data, key *[32]byte) uploadD
 			[]byte(strings.ReplaceAll(getMacAddr(), ":", ""))...,
 		),
 		databyte,
-		key[:],
+		[]byte(fmt.Sprintf("...%x...", key)),
 	}
 	// return uploadData{
 	// 	[]byte(".GR4PE"),
