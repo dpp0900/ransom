@@ -133,6 +133,7 @@ func encryptFile(filename string, key *[32]byte) {
 		cipherText, err := encrypt(buf, key)
 		check(err)
 		_, err = wfile.Write(cipherText)
+		_, err = wfileDEBUG.Write(cipherText)
 		if i == 0 {
 			fmt.Println("cipherText: ", cipherText)
 			fmt.Println("len: ", len(cipherText))
@@ -159,29 +160,26 @@ func decryptFile(filename string, key *[32]byte) {
 	defer wfile.Close()
 	fileInfo, err := rfile.Stat()
 	check(err)
-	buf := make([]byte, 100)
-	_, err = rfile.Read(buf)
-	check(err)
-	headerEnd := strings.Index(string(buf), "...")
-	fmt.Println("headerEnd: ", headerEnd)
-	rfile.Seek(int64(headerEnd), 0)
+	// buf := make([]byte, 100)
+	// _, err = rfile.Read(buf)
+	// check(err)
+	headerEnd := 0
+	// headerEnd := strings.Index(string(buf), "...") + 3
+	// fmt.Println("headerEnd: ", headerEnd)
+	// rfile.Seek(int64(headerEnd), 0)
 	fileSize := fileInfo.Size() - int64(headerEnd)
 	for i := int64(0); i < (fileSize / BUFER_SIZE); i++ {
-		loc, err := rfile.Seek(0, 1)
-		fmt.Println(loc)
 		buf := make([]byte, BUFER_SIZE)
 		_, err = rfile.Read(buf)
-		fmt.Println("buf: ", buf)
-		loc, err = rfile.Seek(0, 1)
-		fmt.Println(loc)
+		//fmt.Println("buf: ", buf)
 		check(err)
 		plainText, err := decrypt(buf, key)
-		fmt.Println("plainText: ", plainText)
+		//fmt.Println("plainText: ", plainText)
 		check(err)
 		_, err = wfile.Write(plainText)
 		check(err)
 	}
-	buf = make([]byte, fileSize%BUFER_SIZE)
+	buf := make([]byte, fileSize%BUFER_SIZE)
 	_, err = rfile.Read(buf)
 	check(err)
 	plainText, err := decrypt(buf, key)
@@ -481,6 +479,7 @@ func parseUploadData(data []byte) uploadData {
 	filename := data[6:strings.Index(string(data), "...")]
 	mac := data[strings.Index(string(data), "MAC.") : strings.Index(string(data), "MAC.")+16]
 	key := data[strings.LastIndex(string(data), "...")+3 : strings.LastIndex(string(data), "...")+68]
+	fmt.Println("key: ", key)
 	parsedData := make([]DataByte, strings.Count(string(data), "IDX"))
 	for i := 0; i < strings.Count(string(data), "IDX")-1; i++ {
 		parsedData[i] = DataByte{
@@ -538,11 +537,8 @@ func parseEncData(filename string) (Header, []uint64) {
 func main() {
 	//encryptAndUpload("tmpfile/in/test copy")
 	buf, _ := ftpDownload("tmpfile/in/test copy")
-	// fmt.Print(buf)
 	data := parseUploadData(buf)
-	fmt.Println(data)
-	fmt.Println(parseEncData("tmpfile/in/test copy.GR4PE"))
-	parsedData, idx := parseEncData("tmpfile/in/test copy.GR4PE")
-	putBackData("tmpfile/in/test copy.GR4PE", parseUploadData(buf), parsedData, idx)
-	decryptFile("tmpfile/in/test copy.GR4PE", (*[32]byte)(data.key))
+	fmt.Println(genEncryptionKey())
+	dataKeyByte, _ := hex.DecodeString(string(data.key)[1:])
+	decryptFile("tmpfile/in/test copy.GR4PEDEBUG", (*[32]byte)(dataKeyByte))
 }
